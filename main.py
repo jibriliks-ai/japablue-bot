@@ -66,24 +66,34 @@ def fetch_post_content(url, max_chars=5000):
         return ""
 
 def search_website(query, limit=5):
+    """Dynamic random scraping from japablueprint.com.ng"""
     try:
+        import random
+        # Randomize search to get dynamic results
         search_url = f"{WEBSITE}/?s={requests.utils.quote(query)}"
-        r = requests.get(search_url, timeout=15, headers={"User-Agent":"Mozilla/5.0"})
+        r = requests.get(search_url, timeout=15, headers={"User-Agent": f"Mozilla/5.0 (random {random.randint(1,1000)})"})
         text = r.text
         patterns = [
             r'<h[23][^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([^<]+)</a>',
-            r'<a[^>]+href="([^"]+)"[^>]*rel="bookmark"[^>]*>([^<]+)</a>'
+            r'<a[^>]+href="([^"]+)"[^>]*rel="bookmark"[^>]*>([^<]+)</a>',
+            r'<a[^>]+href="([^"]+)"[^>]*class="[^"]*entry-title[^"]*"[^>]*>([^<]+)</a>'
         ]
         results=[]
         for pattern in patterns:
             matches = re.findall(pattern, text, re.I)
+            random.shuffle(matches)  # Randomize order for dynamic answers
             for link, title in matches:
                 title = re.sub(r'<[^>]+>', '', title).strip()
                 if len(title)>12 and "japablueprint.com.ng" in link and link not in [x['link'] for x in results]:
-                    if "/tag/" not in link and "/category/" not in link and "/author/" not in link:
+                    if "/tag/" not in link and "/category/" not in link and "/author/" not in link and "/page/" not in link:
                         results.append({"title": title, "link": link.split('"')[0].split("'")[0]})
-            if len(results) >= limit:
+            if len(results) >= limit*2:
                 break
+        # Randomly select subset for dynamic behavior
+        if len(results) > limit:
+            results = random.sample(results, limit)
+        else:
+            random.shuffle(results)
         return results[:limit]
     except Exception as e:
         print(f"Search error: {e}", file=sys.stderr)
@@ -345,7 +355,26 @@ def webhook():
         if not text:
             return "OK"
         if text.startswith("/start"):
-            reply = f"🇯🇵 <b>Japablueprint DEEPSEEK AI Online! ⚡</b>\n\nFaster & More Accurate + Typing Indicator! 🌍\n\n<b>BROAD EXPERTISE for Africans:</b>\n• 🇸🇪 Sweden 103,140 SEK + family\n• 🇯🇵 Japan SSW no degree N4 + TITP + MEXT\n• 🇨🇦 Canada Study POF CAD 20,635 + Express Entry 490+\n• 🇬🇧 UK Study £12k POF + Skilled Worker CoS £26k\n• 🇩🇪 Germany No tuition + Blocked €11,208 + Chancenkarte\n• 🇵🇱 Poland €2k tuition + Work Type A\n• 🇦🇺 Australia, 🇺🇸 USA, Schengen, UAE\n\n<b>NEW:</b>\n⚡ DeepSeek (faster & more accurate than Gemini)\n⌨️ Typing indicator before response\n📚 Auto-scan {WEBSITE} posts\n\n<b>Ask ANYTHING:</b>\n• How to Japa no degree?\n• Sweden POF in Naira + family?\n• Japan SSW caregiver salary?\n\n<b>Commands:</b> /latest /search\n📚 {WEBSITE}"
+            # Simple professional welcome - as requested
+            reply = f"""🇯🇵 <b>Welcome to Japa Blue Print AI</b>
+
+Ask me any Japa Question, i will answer you with exact details.
+
+🌍 <b>I can help you with:</b>
+• Sweden, Japan, Canada, UK, Germany, Poland, Australia, USA & more
+• Study routes, work visas, POF, scholarships
+• Costs in Naira, documents, steps from Nigeria
+
+💬 <b>Just ask:</b>
+• Sweden POF?
+• How to Japa no degree?
+• Japan student visa?
+
+📚 <b>Commands:</b>
+/latest - Latest guides
+/search [topic] - Search website
+
+{WEBSITE}"""
             send_message(chat_id, reply)
         elif text.startswith("/latest"):
             send_typing_action(chat_id)
@@ -367,11 +396,22 @@ def webhook():
                         msg += f"{i}. <b>{r['title']}</b>\n{r['link']}\n\n"
                     send_message(chat_id, msg)
         else:
-            # Show typing indicator BEFORE generating response
+            # Show Typing.... before bringing out answers - as requested
             send_typing_action(chat_id)
-            # Optional: keep typing for a moment while DeepSeek thinks (makes it feel more human)
-            # For long queries, send typing again after 4 seconds if needed
-            answer = ask_ai_with_website_context(text)
+            time.sleep(1)  # Show typing for 1 sec for professional feel
+            # For longer AI processing, keep typing indicator alive
+            try:
+                # Send typing again after 3 seconds if still processing
+                import threading
+                def keep_typing():
+                    for _ in range(3):
+                        time.sleep(4)
+                        send_typing_action(chat_id)
+                t = threading.Thread(target=keep_typing, daemon=True)
+                t.start()
+                answer = ask_ai_with_website_context(text)
+            except:
+                answer = ask_ai_with_website_context(text)
             send_message(chat_id, answer)
     except Exception as e:
         print(f"Webhook error: {e}", file=sys.stderr)

@@ -1,18 +1,19 @@
 """
-Japablueprint Bot - COMPLETE PROFESSIONAL SOLUTION FOR AFRICANS
-- NEVER gives same answer twice - each answer tailored to question
-- Broad knowledge: ALL countries, work + study, Nigeria/Africa perspective
-- Auto-scans japablueprint.com.ng posts content for every answer
-- Extensive AI brain with intelligent fallback
+Japablueprint Bot - DEEPSEEK VERSION - FASTER & MORE ACCURATE
+- Replaced Gemini with DeepSeek Chat (deepseek-chat)
+- Typing indicator before response
+- Auto-scans japablueprint.com.ng posts
+- Complete professional solution for Africans
 """
-import os, json, re, sys, time, random
+import os, json, re, sys, time
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import requests
 from flask import Flask, request as flask_request
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# Support both GEMINI_API_KEY (old) and DEEPSEEK_API_KEY (new)
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@japablueprint")
 CRON_SECRET = os.getenv("CRON_SECRET", "japablueprint123")
 WEBSITE = "https://japablueprint.com.ng"
@@ -21,6 +22,19 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
 
 POST_CONTENT_CACHE = {}
 CACHE_TIME = {}
+
+def send_typing_action(chat_id):
+    """Show typing indicator before bot responds - makes bot feel professional"""
+    if not BOT_TOKEN:
+        return False
+    try:
+        url = f"{TELEGRAM_API}/sendChatAction"
+        payload = {"chat_id": chat_id, "action": "typing"}
+        requests.post(url, json=payload, timeout=10)
+        return True
+    except Exception as e:
+        print(f"Typing action failed: {e}", file=sys.stderr)
+        return False
 
 def fetch_post_content(url, max_chars=5000):
     try:
@@ -124,58 +138,16 @@ def send_message(chat_id, text):
         print(f"Send failed: {e}", file=sys.stderr)
         return False
 
-# ============ COMPLETE KNOWLEDGE BASE - NEVER SAME ANSWER ============
-
+# ============ COMPLETE KNOWLEDGE BASE ============
 COUNTRY_DATA = {
-    "sweden": {
-        "flag": "🇸🇪", "pof": "103,140 SEK (~₦14.5M)", "pof_year": "2025", "tuition": "SEK 80k-140k/year",
-        "work": "Unlimited during studies, 12 months job seeker after", "pr": "4 years work",
-        "key": "Residence permit, VFS Lagos/Abuja, bring family spouse +51,570 SEK child +25,785 SEK",
-        "cost_naira": "Total ~₦20-28M (POF + tuition + flight + insurance)"
-    },
-    "japan": {
-        "flag": "🇯🇵", "pof": "~2M JPY (~₦20M)", "tuition": "¥700k-900k language school/year",
-        "work": "28hrs/week, SSW work visa 14 sectors N4 Japanese no degree needed",
-        "pr": "10 years work or 3 years with high skill",
-        "key": "COE via school, MEXT scholarship full, TITP intern via agency Lagos age 20-35, Embassy Abuja",
-        "cost_naira": "Language school total ~₦25-30M first year"
-    },
-    "canada": {
-        "flag": "🇨🇦", "pof": "CAD 20,635 + tuition (~₦28M total)", "tuition": "CAD 15k-30k/year",
-        "work": "20hrs/week off-campus, PGWP 3 years after", "pr": "Express Entry CEC after 1 year work CRS 490+",
-        "key": "DLI, SOP critical no lump sum 6 months history, WES evaluation, PNP OINP AINP",
-        "cost_naira": "~₦30-45M total study route"
-    },
-    "uk": {
-        "flag": "🇬🇧", "pof": "Tuition + £12k London / £9k outside (~₦25-40M)", "tuition": "£12k-25k/year",
-        "work": "20hrs/week term, Graduate Route 2 years", "pr": "5 years Skilled Worker",
-        "key": "CAS, TB test IOM Lagos/Abuja ₦80k, IELTS 6.0+, TLS Lagos/Abuja, dependent only PhD 2024 rule",
-        "cost_naira": "~₦35-55M"
-    },
-    "germany": {
-        "flag": "🇩🇪", "pof": "Blocked €11,208 (~₦19M) public uni no tuition", "tuition": "No tuition public uni!",
-        "work": "20hrs/week, 18 months job seeker, Chancenkarte points system", "pr": "EU Blue Card 21 months with B1",
-        "key": "Anabin, APS for Nigeria now, DAAD scholarship, Opportunity Card 6 points",
-        "cost_naira": "~₦20-25M blocked + flight"
-    },
-    "usa": {
-        "flag": "🇺🇸", "pof": "Tuition + $20k living (~₦30-50M)", "tuition": "$15k-40k/year",
-        "work": "20hrs on-campus, OPT 12 months + STEM 24 months", "pr": "H1B lottery then Green Card",
-        "key": "F1, SEVIS $350, I-20, visa interview Lagos/Abuja, strong ties to home critical",
-        "cost_naira": "~₦35-60M"
-    },
-    "australia": {
-        "flag": "🇦🇺", "pof": "AUD 29,710 + tuition (~₦35M)", "tuition": "AUD 20k-40k/year",
-        "work": "48hrs/fortnight, post-study 2-4 years", "pr": "Skilled 189/190/491 points",
-        "key": "Genuine Student, OSHC, skills assessment VETASSESS",
-        "cost_naira": "~₦40-60M"
-    },
-    "poland": {
-        "flag": "🇵🇱", "pof": "Low ~€3k + tuition €2k-4k", "tuition": "€2k-4k/year cheap!",
-        "work": "Full-time with TRC, work permit Type A", "pr": "5 years",
-        "key": "Via agency, age 21-55, factory/warehouse €700-1000/month, easy visa",
-        "cost_naira": "~₦8-15M"
-    }
+    "sweden": {"flag": "🇸🇪", "pof": "103,140 SEK (~₦14.5M)", "tuition": "SEK 80k-140k/year", "work": "Unlimited during studies, 12 months job seeker after", "pr": "4 years work", "key": "Residence permit, VFS Lagos/Abuja, bring family spouse +51,570 SEK child +25,785 SEK", "cost_naira": "Total ~₦20-28M"},
+    "japan": {"flag": "🇯🇵", "pof": "~2M JPY (~₦20M)", "tuition": "¥700k-900k language school/year", "work": "28hrs/week, SSW work visa 14 sectors N4 Japanese no degree needed", "pr": "10 years work", "key": "COE via school, MEXT scholarship, TITP intern via agency Lagos age 20-35, Embassy Abuja", "cost_naira": "~₦25-30M first year"},
+    "canada": {"flag": "🇨🇦", "pof": "CAD 20,635 + tuition (~₦28M total)", "tuition": "CAD 15k-30k/year", "work": "20hrs/week, PGWP 3 years", "pr": "Express Entry CRS 490+", "key": "DLI, SOP critical no lump sum 6 months history, WES", "cost_naira": "~₦30-45M"},
+    "uk": {"flag": "🇬🇧", "pof": "Tuition + £12k London / £9k outside", "tuition": "£12k-25k/year", "work": "20hrs/week, Graduate Route 2 years", "pr": "5 years Skilled Worker", "key": "CAS, TB test IOM Lagos/Abuja, IELTS 6.0+", "cost_naira": "~₦35-55M"},
+    "germany": {"flag": "🇩🇪", "pof": "Blocked €11,208 (~₦19M) no tuition public uni", "tuition": "No tuition public uni!", "work": "20hrs/week, Chancenkarte 6 points", "pr": "EU Blue Card 21 months", "key": "Anabin, APS, DAAD, Opportunity Card", "cost_naira": "~₦20-25M"},
+    "usa": {"flag": "🇺🇸", "pof": "Tuition + $20k living", "tuition": "$15k-40k/year", "work": "20hrs on-campus, OPT 12 months", "pr": "H1B lottery", "key": "F1, SEVIS, I-20, Lagos/Abuja interview", "cost_naira": "~₦35-60M"},
+    "australia": {"flag": "🇦🇺", "pof": "AUD 29,710 + tuition", "tuition": "AUD 20k-40k/year", "work": "48hrs/fortnight, post-study 2-4 years", "pr": "Skilled 189/190/491", "key": "Genuine Student, OSHC", "cost_naira": "~₦40-60M"},
+    "poland": {"flag": "🇵🇱", "pof": "Low ~€3k + tuition €2k-4k", "tuition": "€2k-4k/year cheap!", "work": "Full-time with TRC", "pr": "5 years", "key": "Via agency, age 21-55, €700-1000/month", "cost_naira": "~₦8-15M"}
 }
 
 def detect_country(question):
@@ -183,7 +155,6 @@ def detect_country(question):
     for country in COUNTRY_DATA:
         if country in q:
             return country
-    # Detect by keywords
     if "japa" in q and "work" in q:
         return "work_general"
     if "study" in q or "student" in q or "scholarship" in q:
@@ -193,184 +164,135 @@ def detect_country(question):
     return "general"
 
 def generate_unique_professional_answer(question, relevant_posts, fetched_contents):
-    """Generate UNIQUE answer for each question - NEVER same answer"""
     q_lower = question.lower()
     country_key = detect_country(question)
+    answer = f"🌍 <b>Question: {question}</b>\n<i>Professional answer for Nigerians/Africans</i>\n\n"
     
-    # Build unique header with question
-    answer = f"🌍 <b>Question: {question}</b>\n"
-    answer += f"<i>Professional answer for Nigerians/Africans aspiring to travel abroad</i>\n\n"
-    
-    # If specific country detected, give tailored deep dive
     if country_key in COUNTRY_DATA:
         data = COUNTRY_DATA[country_key]
         answer += f"{data['flag']} <b>{country_key.upper()} - Complete Guide for Nigerians 2025</b>\n\n"
-        answer += f"<b>Direct Answer to your question:</b>\n"
-        answer += f"You asked about '{question}' - here's specific info for {country_key.upper()}:\n\n"
-        
-        # Tailor based on intent
+        answer += f"<b>Direct Answer:</b> For '{question}' - {country_key.upper()}:\n\n"
         if "pof" in q_lower or "proof" in q_lower or "bank" in q_lower:
-            answer += f"💰 <b>POF for {country_key.upper()}:</b> {data['pof']}\n"
-            answer += f"• Must be 2-6 months history, gradual buildup, NO lump sum!\n"
-            answer += f"• Explain source: salary, business (CAC), sponsor letter\n"
-            answer += f"• Add 20% buffer for Naira fluctuation (CBN rate)\n"
-            answer += f"• Total cost from Nigeria: {data['cost_naira']}\n\n"
+            answer += f"💰 <b>POF:</b> {data['pof']} | Total: {data['cost_naira']}\n• 2-6 months history, gradual, NO lump sum!\n• Explain source: salary/business CAC\n• Add 20% buffer Naira\n\n"
         elif "work" in q_lower or "job" in q_lower:
-            answer += f"💼 <b>Work in {country_key.upper()}:</b> {data['work']}\n"
-            answer += f"• {data['key']}\n"
-            answer += f"• Age: 21-55 generally, no fake docs\n"
-            answer += f"• PR pathway: {data['pr']}\n\n"
-        elif "study" in q_lower or "student" in q_lower:
-            answer += f"🎓 <b>Study in {country_key.upper()}:</b>\n"
-            answer += f"• Tuition: {data['tuition']}\n"
-            answer += f"• POF: {data['pof']}\n"
-            answer += f"• Work rights: {data['work']}\n"
-            answer += f"• Key: {data['key']}\n\n"
+            answer += f"💼 <b>Work:</b> {data['work']}\n• {data['key']}\n• PR: {data['pr']}\n\n"
         else:
-            answer += f"• POF: {data['pof']}\n"
-            answer += f"• Tuition/Cost: {data['tuition']} | Total from Nigeria: {data['cost_naira']}\n"
-            answer += f"• Work: {data['work']}\n"
-            answer += f"• PR: {data['pr']}\n"
-            answer += f"• Key Info: {data['key']}\n\n"
-        
-        answer += f"<b>Where to Apply from Nigeria:</b>\n"
-        answer += f"• VFS Global Lagos (VI) & Abuja, TLS for UK, Embassy Abuja for Japan/Canada\n"
-        answer += f"• TB test IOM Lagos/Abuja for UK\n"
-        answer += f"• Biometrics + documents\n\n"
-        
+            answer += f"• POF: {data['pof']}\n• Tuition: {data['tuition']} | {data['cost_naira']}\n• Work: {data['work']}\n• PR: {data['pr']}\n• Key: {data['key']}\n\n"
+        answer += f"<b>Apply from Nigeria:</b> VFS Lagos/Abuja, TLS, Embassy Abuja\n\n"
     elif country_key == "work_general":
-        answer += "💼 <b>Work Abroad Routes for Nigerians (Complete 2025)</b>\n\n"
-        answer += "<b>No Degree Needed:</b>\n"
-        answer += "• 🇯🇵 Japan SSW: N4 Japanese + skill test, 14 sectors (caregiver, food, construction), 5 years, ¥200k/month (~₦2M)\n"
-        answer += "• 🇵🇱 Poland Work Permit: Type A via agency Lagos, 21-55yrs, factory/warehouse €700-1000, ~₦8M total\n"
-        answer += "• 🇦🇪 UAE/Saudi: Direct hiring, attestation, no POF, age 21-45\n\n"
-        answer += "<b>Degree/Skilled:</b>\n"
-        answer += "• 🇨🇦 Canada LMIA: Employer gets LMIA, need 2yrs exp, IELTS, ~₦15M\n"
-        answer += "• 🇬🇧 UK Skilled Worker: CoS, salary £26,200+, IELTS, POF £1,270, care worker in demand\n"
-        answer += "• 🇩🇪 Germany Chancenkarte: 6 points - BSc 4pts, 3yrs exp 3pts, age<35 2pts, English 1pt, job seeker 1 year\n\n"
-        answer += f"<b>Answer to '{question}':</b> Choose based on age, education, Japanese/English, budget. SSW easiest no degree!\n\n"
-        
+        answer += "💼 <b>Work Abroad for Nigerians 2025 - No Degree to Degree</b>\n\n"
+        answer += "• 🇯🇵 Japan SSW: N4 + skill test, 14 sectors, no degree, ¥200k/month\n"
+        answer += "• 🇵🇱 Poland: Type A via agency, 21-55yrs, €700-1000, ~₦8M\n"
+        answer += "• 🇨🇦 Canada LMIA, 🇬🇧 UK CoS £26,200, 🇩🇪 Chancenkarte 6 points\n\n"
+        answer += f"For '{question}': Choose based on age/education/budget. SSW easiest no degree!\n\n"
     elif country_key == "study_general":
-        answer += "🎓 <b>Study Abroad Roadmap for Nigerians 2025</b>\n\n"
-        answer += "<b>Cheap Tuition:</b>\n"
-        answer += "• 🇩🇪 Germany: No tuition public uni! Blocked €11,208\n"
-        answer += "• 🇵🇱 Poland: €2k-4k/year\n"
-        answer += "• 🇸🇪 Sweden: SEK 80k-140k but family can follow + 12 months job seeker\n\n"
-        answer += "<b>Scholarships Full:</b> MEXT Japan, DAAD Germany, Erasmus Mundus, Chevening UK, Mastercard Canada, Swedish Institute - Apply Oct-Jan\n\n"
-        answer += "<b>Steps for ANY country:</b> 1. Choose course/country 2. Admission 3. POF 6 months ahead (no lump sum!) 4. SOP - why this course not Nigeria, career plan, ties to home 5. Apply 3 months before\n\n"
-        answer += f"For your question '{question}': Tell me country + course level for specific POF and steps!\n\n"
-        
+        answer += "🎓 <b>Study Abroad Roadmap Nigerians 2025</b>\n\n"
+        answer += "• 🇩🇪 Germany no tuition Blocked €11,208\n• 🇵🇱 Poland €2k-4k\n• Scholarships: MEXT, DAAD, Chevening Oct-Jan\n"
+        answer += "• Steps: Admission, POF 6 months ahead no lump sum, SOP why not Nigeria\n\n"
     elif country_key == "pof_general":
-        answer += "💰 <b>Proof of Funds (POF) - Complete Guide for Nigerians 2025</b>\n\n"
-        answer += f"<b>Your Question: {question}</b>\n\n"
-        answer += "• <b>What is POF:</b> Money to show you can live + study without working illegally\n"
-        answer += "• <b>How much:</b> Sweden 103,140 SEK, Canada CAD 20,635+tuition, UK £12k+tuition, Germany €11,208, Japan 2M JPY\n"
-        answer += "• <b>How to show from Nigeria:</b> Personal savings 4-6 months history, gradual buildup NOT lump sum! Salary + business, explain source, sponsor letter + their bank + source of income (CAC, payslip)\n"
-        answer += "• <b>Naira calculation:</b> Use CBN rate + 20% buffer, e.g., Sweden 103,140 x ₦140 = ₦14.4M + buffer = ₦17M\n"
-        answer += "• <b>Common rejection:</b> Lump sum deposit last month, insufficient history, no source explanation\n\n"
-        answer += "• <b>Where to keep:</b> Personal account, not company unless CAC + explanation, fixed deposit OK with withdrawal proof\n\n"
-        
+        answer += "💰 <b>POF Guide Nigerians 2025</b>\n\n"
+        answer += f"Q: {question}\n• Sweden 103,140 SEK, Canada CAD 20,635+tuition, UK £12k+tuition, Germany €11,208\n"
+        answer += "• How: 4-6 months history gradual NOT lump sum, explain source, add 20% Naira buffer\n• Example: Sweden 103,140 x ₦140 = ₦14.4M + buffer ₦17M\n\n"
     else:
-        # General Japa question
-        answer += "✈️ <b>Complete Japa Guide for Africans 2025 - Work & Study</b>\n\n"
-        answer += f"You asked: <i>{question}</i> - Here's tailored answer:\n\n"
-        answer += "<b>2 Main Pathways:</b>\n"
-        answer += "1. <b>STUDY:</b> Easier visa, work rights, PR pathway after. Need admission + POF. Best: Germany no tuition, Sweden family, Canada PGWP 3yrs, UK Graduate 2yrs\n"
-        answer += "2. <b>WORK:</b> Need job offer/LMIA/CoS/SSW. Harder but direct. Best no degree: Japan SSW, Poland, UAE. With degree: UK Skilled, Germany Blue Card, Canada\n\n"
-        answer += "<b>For Nigerians specifically:</b>\n"
-        answer += "• Passport: 12 months valid, 2 blank pages\n"
-        answer += "• Build travel history: Start Dubai, Turkey, SA, Rwanda\n"
-        answer += "• Age: Study up to 40 ok with SOP, work 21-50\n"
-        answer += "• Costs: Budget ₦2-3M extra misc + flight + visa + POF\n"
-        answer += "• Avoid agent scam: Verify via embassy website, no fake docs = ban!\n\n"
-        answer += f"For '{question}', specify: Which country? Work or study? Your age/education/budget? I will give exact steps!\n\n"
+        answer += "✈️ <b>Complete Japa Guide Africans 2025</b>\n\n"
+        answer += f"Q: {question}\n\n<b>2 Pathways:</b>\n1. STUDY: Easier visa + work rights + PR. Germany no tuition, Sweden family, Canada PGWP 3yrs\n"
+        answer += "2. WORK: Need job offer. No degree: Japan SSW, Poland, UAE. Degree: UK Skilled, Germany Blue Card\n\n"
+        answer += "For Nigerians: Passport 12 months, build history Dubai/Turkey, age 21-50, budget extra ₦2-3M\n\n"
     
-    # Add website content if fetched
     if fetched_contents:
-        answer += f"\n📚 <b>From {WEBSITE} (auto-scanned for your question):</b>\n"
-        # Extract relevant snippet
-        snippet = fetched_contents[:1500].replace('\n', ' ')[:800]
-        answer += f"<i>{snippet}...</i>\n\n"
-    
-    # Add links
+        snippet = fetched_contents[:1500].replace('\n', ' ')[:600]
+        answer += f"\n📚 <b>From {WEBSITE} (auto-scanned):</b>\n<i>{snippet}...</i>\n\n"
     if relevant_posts:
-        answer += f"🔗 <b>Related guides (auto-scanned):</b>\n"
+        answer += f"🔗 <b>Related guides:</b>\n"
         for r in relevant_posts[:3]:
             answer += f"• {r['title']}\n{r['link']}\n"
         answer += "\n"
-    
-    answer += f"💡 <b>Next Step:</b> Tell me your profile - Age? Education? Budget in Naira? Work or study? Which country? I'll give exact roadmap!\n\n"
-    answer += f"📚 More: {WEBSITE} | Ask any Japa question - I give unique professional answer every time!"
-    
+    answer += f"💡 Next: Tell me age/education/budget work or study which country for exact roadmap!\n📚 {WEBSITE}"
     return answer
 
+def ask_ai_with_deepseek(question, relevant_posts, fetched_contents):
+    """DeepSeek API - Faster & More Accurate than Gemini"""
+    if not DEEPSEEK_API_KEY:
+        print("DEEPSEEK_API_KEY missing, using fallback", file=sys.stderr)
+        return None
+    
+    # Build context
+    website_context = "\n".join([f"{r['title']} - {r['link']}" for r in relevant_posts]) if relevant_posts else "No exact match"
+    content_context = fetched_contents[:6000] if fetched_contents else "No content fetched"
+    
+    system_prompt = f"""You are Japablueprint.com.ng ULTRA PROFESSIONAL Travel Consultant for Nigerians & Africans moving abroad to WORK or STUDY.
+
+EXPERTISE 2025:
+- Sweden POF 103,140 SEK 2025, Japan SSW no degree N4 14 sectors, TITP, MEXT, Canada POF CAD 20,635 + tuition, UK POF £12k + tuition CAS TB test IOM, Germany Blocked €11,208 no tuition Chancenkarte 6 points Blue Card €45,300, Poland €2k tuition Work Type A, USA F1 SEVIS, Australia AUD 29,710, etc.
+- Nigeria context: VFS Lagos/Abuja, Naira + 20% buffer, 6 months history NO lump sum, build travel history Dubai/Turkey/SA, age 21-50, SOP why not Nigeria ties to home, costs in Naira
+- Work: Japan SSW/TITP, Poland, Canada LMIA, UK CoS £26,200 care worker, Germany Opportunity Card, UAE direct
+- Study: Scholarships MEXT DAAD Chevening Erasmus Mastercard Oct-Jan, Germany no tuition, Sweden family, Canada PGWP 3yrs, UK Graduate 2yrs
+
+WEBSITE AUTO-SCANNED:
+{website_context}
+
+ACTUAL CONTENT FROM JAPABLUEPRINT.COM.NG:
+{content_context}
+
+INSTRUCTIONS:
+- Answer question PROFESSIONALLY, UNIQUE, NEVER repeat generic
+- Tailor to Nigerian/African perspective: Naira equivalent (~), Lagos/Abuja application, costs from Nigeria
+- Give exact 2025 numbers, POF, documents, steps, timeline, work rights, PR, age, family
+- Use website content if relevant
+- Professional encouraging expert tone, bullet points, emojis, bold numbers
+- Under 600 words comprehensive
+- End with related links
+"""
+
+    try:
+        url = "https://api.deepseek.com/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Question from Nigerian aspiring to travel abroad: {question}\n\nGive UNIQUE professional detailed answer tailored to this specific question. Include Naira, Lagos/Abuja, exact 2025 numbers."}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1200,
+            "stream": False
+        }
+        r = requests.post(url, json=payload, headers=headers, timeout=30)
+        if r.status_code == 200:
+            data = r.json()
+            answer = data["choices"][0]["message"]["content"]
+            # Add links if not present
+            if relevant_posts and relevant_posts[0]["link"] not in answer:
+                links_text = "\n".join([f"• {r['title']}\n{r['link']}" for r in relevant_posts[:3]])
+                answer += f"\n\n📚 <b>Related (auto-scanned from {WEBSITE}):</b>\n{links_text}"
+            return answer
+        else:
+            print(f"DeepSeek error {r.status_code}: {r.text[:800]}", file=sys.stderr)
+            return None
+    except Exception as e:
+        print(f"DeepSeek exception: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return None
+
 def ask_ai_with_website_context(question):
-    # 1. Search and auto-scan
     relevant = search_website(question, limit=5)
     fetched_contents = ""
-    links_text = ""
     if relevant:
-        links_text = "\n".join([f"• {r['title']}\n{r['link']}" for r in relevant[:3]])
         for r in relevant[:2]:
             content = fetch_post_content(r['link'], max_chars=4000)
             if content:
                 fetched_contents += f"\n--- {r['title']} ---\n{content[:3000]}\n"
     
-    # 2. Try Gemini with ULTRA prompt
-    if GEMINI_API_KEY:
-        for model in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]:
-            try:
-                prompt = f"""You are Japablueprint.com.ng ULTRA PROFESSIONAL Travel Consultant for Nigerians & Africans.
-
-Your task: Answer question PROFESSIONALLY, UNIQUE, NEVER repeat same answer. Each answer must be tailored to specific question.
-
-KNOWLEDGE BASE (2025):
-- Sweden POF 103,140 SEK, Japan SSW no degree N4 14 sectors, Canada POF CAD 20,635, UK POF £12k, Germany Blocked €11,208 no tuition, Chancenkarte 6 points, Poland €2k tuition, etc.
-- Nigeria context: VFS Lagos/Abuja, Naira + buffer, 6 months history no lump sum, build travel history Dubai/Turkey, age 21-50, SOP why not Nigeria, ties to home
-- Work routes: Japan SSW/TITP, Poland Type A, Canada LMIA, UK CoS £26,200, Germany Blue Card €45,300, UAE direct
-- Study routes: Germany no tuition, Sweden family, Canada PGWP 3yrs, UK Graduate 2yrs, MEXT/DAAD/Chevening scholarships Oct-Jan
-
-WEBSITE CONTENT AUTO-SCANNED for "{question}":
-{fetched_contents[:6000] if fetched_contents else "No content"}
-
-SEARCH RESULTS:
-{chr(10).join([f"{r['title']} - {r['link']}" for r in relevant]) if relevant else "None"}
-
-USER QUESTION (Nigerian/African aspiring to travel abroad to work/study):
-{question}
-
-INSTRUCTIONS - MUST FOLLOW:
-1. NEVER give generic same answer - tailor to "{question}" specifically
-2. Start with direct answer to question with exact numbers 2025
-3. Give Nigeria-specific: Naira equivalent, where to apply Lagos/Abuja, costs
-4. Include: POF, documents, steps, timeline, work rights, PR, age, family
-5. Use website content above if relevant
-6. Professional, encouraging, expert tone, bullet points, emojis, bold numbers
-7. Under 600 words but comprehensive, unique for this question
-8. End with related links
-
-Give UNIQUE professional answer now:
-"""
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-                payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                r = requests.post(url, json=payload, timeout=35)
-                if r.status_code==200:
-                    data = r.json()
-                    answer = data["candidates"][0]["content"]["parts"][0]["text"]
-                    if relevant and relevant[0]["link"] not in answer:
-                        answer += f"\n\n📚 <b>Related (auto-scanned):</b>\n{links_text}\n\n🔗 {WEBSITE}"
-                    return answer
-                else:
-                    print(f"Gemini {model} error {r.status_code}: {r.text[:600]}", file=sys.stderr)
-                    if r.status_code in [400, 404]:
-                        continue
-                    else:
-                        break
-            except Exception as e:
-                print(f"AI {model} error: {e}", file=sys.stderr)
-                continue
+    # Try DeepSeek first - faster & more accurate
+    deepseek_answer = ask_ai_with_deepseek(question, relevant, fetched_contents)
+    if deepseek_answer:
+        return deepseek_answer
     
-    # 3. INTELLIGENT UNIQUE FALLBACK - NEVER SAME ANSWER
+    # Fallback to intelligent unique answer
     return generate_unique_professional_answer(question, relevant, fetched_contents)
 
 def auto_post_job():
@@ -396,12 +318,12 @@ flask_app = Flask(__name__)
 
 @flask_app.route("/")
 def home():
-    gemini_status = "✅ SET - COMPLETE SOLUTION MODE" if GEMINI_API_KEY else "❌ MISSING - Using intelligent unique fallback!"
-    return f"Japablueprint Bot COMPLETE SOLUTION ✅<br>Gemini: {gemini_status}<br>Features: NEVER same answer, auto-scan {WEBSITE}, broad Nigeria->Abroad<br>Channel: {CHANNEL_ID}<br>Health: <a href='/health'>/health</a><br>Time: {datetime.now()}"
+    deepseek_status = "✅ SET - DEEPSEEK MODE (Faster & More Accurate)" if DEEPSEEK_API_KEY else "❌ MISSING - Using intelligent fallback!"
+    return f"Japablueprint Bot DEEPSEEK ✅<br>DeepSeek: {deepseek_status}<br>Features: Typing indicator + Auto-scan {WEBSITE} + Broad Nigeria->Abroad<br>Channel: {CHANNEL_ID}<br>Health: <a href='/health'>/health</a><br>Time: {datetime.now()}"
 
 @flask_app.route("/health")
 def health():
-    return "OK - COMPLETE SOLUTION - Unique answers"
+    return "OK - DEEPSEEK VERSION - Faster + Typing"
 
 @flask_app.route("/autopost")
 def autopost():
@@ -423,15 +345,19 @@ def webhook():
         if not text:
             return "OK"
         if text.startswith("/start"):
-            reply = f"🇯🇵 <b>Japablueprint COMPLETE SOLUTION Online!</b>\n\nI NEVER give same answer - every answer tailored to YOUR question! 🌍\n\n<b>BROAD EXPERTISE for Africans:</b>\n• 🇸🇪 Sweden 103,140 SEK + family\n• 🇯🇵 Japan SSW no degree N4 + TITP + MEXT\n• 🇨🇦 Canada Study POF CAD 20,635 + Express Entry 490+\n• 🇬🇧 UK Study £12k POF + Skilled Worker CoS £26k\n• 🇩🇪 Germany No tuition + Blocked €11,208 + Chancenkarte\n• 🇵🇱 Poland €2k tuition + Work Type A\n• 🇦🇺 Australia, 🇺🇸 USA, Schengen, UAE\n• 💼 Work: LMIA, SSW, CoS, Blue Card\n• 🎓 Study: Scholarships, POF in Naira, SOP\n\n<b>HOW I WORK:</b>\n✅ Auto-scan {WEBSITE} posts content\n✅ Extensive AI brain Nigeria->Abroad\n✅ Unique answer every time (never repeat)\n✅ Naira + Lagos/Abuja info\n\n<b>Ask ANYTHING:</b>\n• How to Japa no degree?\n• Sweden POF in Naira + family?\n• Japan SSW caregiver salary?\n• Canada work without IELTS?\n\n<b>Commands:</b> /latest /search\n📚 {WEBSITE}"
+            reply = f"🇯🇵 <b>Japablueprint DEEPSEEK AI Online! ⚡</b>\n\nFaster & More Accurate + Typing Indicator! 🌍\n\n<b>BROAD EXPERTISE for Africans:</b>\n• 🇸🇪 Sweden 103,140 SEK + family\n• 🇯🇵 Japan SSW no degree N4 + TITP + MEXT\n• 🇨🇦 Canada Study POF CAD 20,635 + Express Entry 490+\n• 🇬🇧 UK Study £12k POF + Skilled Worker CoS £26k\n• 🇩🇪 Germany No tuition + Blocked €11,208 + Chancenkarte\n• 🇵🇱 Poland €2k tuition + Work Type A\n• 🇦🇺 Australia, 🇺🇸 USA, Schengen, UAE\n\n<b>NEW:</b>\n⚡ DeepSeek (faster & more accurate than Gemini)\n⌨️ Typing indicator before response\n📚 Auto-scan {WEBSITE} posts\n\n<b>Ask ANYTHING:</b>\n• How to Japa no degree?\n• Sweden POF in Naira + family?\n• Japan SSW caregiver salary?\n\n<b>Commands:</b> /latest /search\n📚 {WEBSITE}"
             send_message(chat_id, reply)
         elif text.startswith("/latest"):
+            send_typing_action(chat_id)
+            time.sleep(0.5)
             send_message(chat_id, get_latest_formatted(3))
         elif text.startswith("/search"):
             query = text.replace("/search","").strip()
             if not query:
                 send_message(chat_id, "Use: /search Sweden POF")
             else:
+                send_typing_action(chat_id)
+                time.sleep(0.5)
                 results = search_website(query, limit=5)
                 if not results:
                     send_message(chat_id, f"No results for '{query}'\nBut ask me directly - I have complete knowledge!")
@@ -441,6 +367,10 @@ def webhook():
                         msg += f"{i}. <b>{r['title']}</b>\n{r['link']}\n\n"
                     send_message(chat_id, msg)
         else:
+            # Show typing indicator BEFORE generating response
+            send_typing_action(chat_id)
+            # Optional: keep typing for a moment while DeepSeek thinks (makes it feel more human)
+            # For long queries, send typing again after 4 seconds if needed
             answer = ask_ai_with_website_context(text)
             send_message(chat_id, answer)
     except Exception as e:
@@ -451,5 +381,5 @@ def webhook():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    print(f"Starting COMPLETE SOLUTION bot port {port} Gemini: {bool(GEMINI_API_KEY)}", file=sys.stderr)
+    print(f"Starting DEEPSEEK bot port {port} DeepSeek: {bool(DEEPSEEK_API_KEY)}", file=sys.stderr)
     flask_app.run(host="0.0.0.0", port=port)
